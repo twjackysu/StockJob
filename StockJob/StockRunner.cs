@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StockLib;
 using System;
@@ -79,23 +80,51 @@ namespace StockJob
             }
             var otcResult = await Task.WhenAll(otcTasks);
 
+            var isSyncTimeExist = false;
+            var isfirstLoop = true;
 
             foreach (var each50Stock in tseResult)
             {
+                if (isSyncTimeExist)
+                {
+                    break;
+                }
                 if (each50Stock != null)
                 {
                     foreach (var stockInfo in each50Stock)
                     {
+                        if (isfirstLoop)
+                        {
+                            isSyncTimeExist = dbContext.StockInfo.Any(x => x.SyncTime == stockInfo.SyncTime);
+                            isfirstLoop = false;
+                        }
+                        if (isSyncTimeExist)
+                        {
+                            break;
+                        }
                         dbContext.Add(ConvertDBStockInfo(stockInfo));
                     }
                 }
             }
             foreach (var each50Stock in otcResult)
             {
+                if (isSyncTimeExist)
+                {
+                    break;
+                }
                 if (each50Stock != null)
                 {
                     foreach (var stockInfo in each50Stock)
                     {
+                        if (isfirstLoop)
+                        {
+                            isSyncTimeExist = dbContext.StockInfo.Any(x => x.SyncTime == stockInfo.SyncTime);
+                            isfirstLoop = false;
+                        }
+                        if (isSyncTimeExist)
+                        {
+                            break;
+                        }
                         dbContext.Add(ConvertDBStockInfo(stockInfo));
                     }
                 }
