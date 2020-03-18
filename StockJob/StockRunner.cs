@@ -104,6 +104,15 @@ namespace StockJob
                         }
                         dbContext.Add(ConvertDBStockInfo(stockInfo));
                     }
+                    try
+                    {
+                        await dbContext.SaveChangesAsync();
+                    }
+                    catch (DbUpdateException e)
+                    {
+                        logger.LogInformation($"Sync Fail.");
+                        logger.LogError(e.ToString());
+                    }
                 }
             }
             foreach (var each50Stock in otcResult)
@@ -127,17 +136,16 @@ namespace StockJob
                         }
                         dbContext.Add(ConvertDBStockInfo(stockInfo));
                     }
+                    try
+                    {
+                        await dbContext.SaveChangesAsync();
+                    }
+                    catch (DbUpdateException e)
+                    {
+                        logger.LogInformation($"Sync Fail.");
+                        logger.LogError(e.ToString());
+                    }
                 }
-            }
-            try
-            {
-                await dbContext.SaveChangesAsync();
-                logger.LogInformation($"Sync success.");
-            }
-            catch (DbUpdateException e)
-            {
-                logger.LogInformation($"Sync Fail.");
-                logger.LogError(e.ToString());
             }
         }
         private Models.StockInfo ConvertDBStockInfo(StockInfo stockInfo)
