@@ -24,9 +24,10 @@ namespace StockJob
             var TSEList = test.GetTSEList();
             var OTCList = test.GetOTCList();
             //API限制，因此一次只能取50筆
-            var tseTotalLoop = (TSEList.Length / 50) + 1;
-            var otcTotalLoop = (OTCList.Length / 50) + 1;
+            var tseTotalLoop = (TSEList.Count / 50) + 1;
+            var otcTotalLoop = (OTCList.Count / 50) + 1;
             var taskCount = 0;
+            var tseTaskQuerys = new Task<(StockType, string)[]>[tseTotalLoop];
             var tseTasks = new Task<List<StockInfo>>[tseTotalLoop];
             while (taskCount < tseTotalLoop)
             {
@@ -39,18 +40,8 @@ namespace StockJob
                     x => OTCList.Any(y => y == x) ? (StockType.OTC, x) : (StockType.TSE, x)
                 ).ToArray();
                 var result = stockInfoBuilder.GetStocksInfo(false, queries);
-                if (result != null)
-                {
-                    tseTasks[taskCount] = result;
-                    taskCount++;
-                }
-                else
-                {
-                    logger.LogWarning("Get stock price fail.");
-                    //沒Result 30秒再打
-                    await Task.Delay(30000);
-                }
-
+                tseTasks[taskCount] = result;
+                taskCount++;
             }
             taskCount = 0;
             var tseResult = await Task.WhenAll(tseTasks);
@@ -66,17 +57,8 @@ namespace StockJob
                     x => OTCList.Any(y => y == x) ? (StockType.OTC, x) : (StockType.TSE, x)
                 ).ToArray();
                 var result = stockInfoBuilder.GetStocksInfo(false, queries);
-                if (result != null)
-                {
-                    otcTasks[taskCount] = result;
-                    taskCount++;
-                }
-                else
-                {
-                    logger.LogWarning("Get stock price fail.");
-                    //沒Result 30秒再打
-                    await Task.Delay(30000);
-                }
+                otcTasks[taskCount] = result;
+                taskCount++;
             }
             var otcResult = await Task.WhenAll(otcTasks);
 
