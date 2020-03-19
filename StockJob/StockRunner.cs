@@ -39,6 +39,7 @@ namespace StockJob
                 var queries = take50List.Select(
                     x => OTCList.Any(y => y == x) ? (StockType.OTC, x) : (StockType.TSE, x)
                 ).ToArray();
+                await Task.Delay(500);
                 var result = stockInfoBuilder.GetStocksInfo(false, queries);
                 tseTasks[taskCount] = result;
                 taskCount++;
@@ -56,6 +57,7 @@ namespace StockJob
                 var queries = take50List.Select(
                     x => OTCList.Any(y => y == x) ? (StockType.OTC, x) : (StockType.TSE, x)
                 ).ToArray();
+                await Task.Delay(500);
                 var result = stockInfoBuilder.GetStocksInfo(false, queries);
                 otcTasks[taskCount] = result;
                 taskCount++;
