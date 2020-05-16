@@ -1,8 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using PersonalAssistant.Models;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using StockJob.Models;
 
 namespace StockJob
 {

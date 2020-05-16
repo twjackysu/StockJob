@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace PersonalAssistant.Models
+namespace StockJob.Models
 {
     public class Top5Sell
     {
