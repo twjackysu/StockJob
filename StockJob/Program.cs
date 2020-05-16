@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NLog;
 using NLog.Extensions.Logging;
+using StockLib;
 using System;
 using System.Threading.Tasks;
 
@@ -27,7 +28,7 @@ namespace StockJob
                     var runner = servicesProvider.GetRequiredService<StockRunner>();
                     using (var dbContext = new StockDBContext())
                     {
-                        await runner.SaveStockInfoToDataBase(dbContext);
+                        await runner.OneTimeCrawler(dbContext, new DateTime(2010, 5, 10));
                     }
                 }
             }
@@ -49,6 +50,9 @@ namespace StockJob
         {
             return new ServiceCollection()
                .AddTransient<StockRunner>() // Runner is the custom class
+               .AddTransient<IHistoryBuilder, HistoryBuilder>()
+               .AddTransient<IStockInfoBuilder, StockInfoBuilder>()
+               .AddTransient<ITSEOTCListBuilder, TSEOTCListBuilder>()
                .AddLogging(loggingBuilder =>
                {
                    // configure Logging with NLog
