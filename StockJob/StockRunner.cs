@@ -15,6 +15,8 @@ namespace StockJob
         private readonly IHistoryBuilder historyBuilder;
         private readonly ITSEOTCListBuilder tseOTCListBuilder;
         private readonly IStockInfoBuilder stockInfoBuilder;
+        private const int nextMonthDelayMax = 5000;
+        private const int InfoNullDelayMax = 60000;
         public StockRunner(ILogger<StockRunner> logger, IHistoryBuilder historyBuilder, ITSEOTCListBuilder tseOTCListBuilder, IStockInfoBuilder stockInfoBuilder)
         {
             this.logger = logger;
@@ -43,7 +45,7 @@ namespace StockJob
                     info = (await stockInfoBuilder.GetStocksInfo((StockType.TSE, tse))).SingleOrDefault();
                     if(info == null)
                     {
-                        var delayMs = random.Next(60000);
+                        var delayMs = random.Next(InfoNullDelayMax);
                         logger.LogInformation($"Get StockInfo Fail. Retry in {delayMs} ms");
                         await Task.Delay(delayMs);
                     }
@@ -67,14 +69,14 @@ namespace StockJob
                             dbContext.Add(ConvertDBStockHistory(history, info.No, info.Type.ToString(), info.Name, info.FullName));
                         }
                         await dbContext.SaveChangesAsync();
+                        var delayMs = random.Next(nextMonthDelayMax);
+                        logger.LogInformation($"{currentMonth:yyyyMM} {info.No} Success. The next one start after {delayMs} ms");
                         currentMonth = currentMonth.AddMonths(-1);
-                        var delayMs = random.Next(5000);
-                        logger.LogInformation($"{info.No} Success. The next one start after {delayMs} ms");
                         await Task.Delay(delayMs);
                     }
                     catch(Exception e)
                     {
-                        logger.LogError(e, $"Error when CurrentMonth = {currentMonth:yyyyMMdd}");
+                        logger.LogError(e, $"Error when CurrentMonth = {currentMonth:yyyyMM} {info.No} {info.Name}");
                     }
                 }
             }
@@ -87,7 +89,7 @@ namespace StockJob
                     info = (await stockInfoBuilder.GetStocksInfo((StockType.OTC, otc))).SingleOrDefault();
                     if (info == null)
                     {
-                        var delayMs = random.Next(60000);
+                        var delayMs = random.Next(InfoNullDelayMax);
                         logger.LogInformation($"Get StockInfo Fail. Retry in {delayMs} ms");
                         await Task.Delay(delayMs);
                     }
@@ -111,14 +113,14 @@ namespace StockJob
                             dbContext.Add(ConvertDBStockHistory(history, info.No, info.Type.ToString(), info.Name, info.FullName));
                         }
                         await dbContext.SaveChangesAsync();
+                        var delayMs = random.Next(nextMonthDelayMax);
+                        logger.LogInformation($"{currentMonth:yyyyMM} {info.No} Success. The next one start after {delayMs} ms");
                         currentMonth = currentMonth.AddMonths(-1);
-                        var delayMs = random.Next(5000);
-                        logger.LogInformation($"{info.No} Success. The next one start after {delayMs} ms");
                         await Task.Delay(delayMs);
                     }
                     catch (Exception e)
                     {
-                        logger.LogError(e, $"Error when CurrentMonth = {currentMonth:yyyyMMdd}");
+                        logger.LogError(e, $"Error when CurrentMonth = {currentMonth:yyyyMM} {info.No} {info.Name}");
                     }
                 }
             }

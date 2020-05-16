@@ -28,7 +28,7 @@ namespace StockJob
                     var runner = servicesProvider.GetRequiredService<StockRunner>();
                     using (var dbContext = new StockDBContext())
                     {
-                        await runner.OneTimeCrawler(dbContext, new DateTime(2010, 5, 10));
+                        await runner.OneTimeCrawler(dbContext, new DateTime(2017, 1, 1));
                     }
                 }
             }
