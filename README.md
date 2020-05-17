@@ -28,9 +28,9 @@ dotnet ef database updat
 
 StockJob/Program.cs - 爬20170101到今天為止的所有股價資料到資料庫
 ```C#
-await runner.OneTimeCrawler(dbContext, new DateTime(2017, 1, 1));
+await runner.OneTimeCrawler(new DateTime(2017, 1, 1));
 ```
 StockJob/Program.cs - 爬20170101到今天為止的台泥(1101)股價資料到資料庫
 ```C#
-await runner.OneTimeCrawler("1101", StockType.TSE, dbContext, new DateTime(2017, 1, 1));
+await runner.OneTimeCrawler("1101", StockType.TSE, new DateTime(2017, 1, 1));
 ```

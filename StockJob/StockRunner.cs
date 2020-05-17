@@ -15,35 +15,36 @@ namespace StockJob
         private readonly IHistoryBuilder historyBuilder;
         private readonly ITSEOTCListBuilder tseOTCListBuilder;
         private readonly IStockInfoBuilder stockInfoBuilder;
+        private readonly StockDBContext dbContext;
         private const int nextMonthDelayMin = 4000;
         private const int nextMonthDelayMax = 12000;
         private const int InfoNullDelayMax = 60000;
-        public StockRunner(ILogger<StockRunner> logger, IHistoryBuilder historyBuilder, ITSEOTCListBuilder tseOTCListBuilder, IStockInfoBuilder stockInfoBuilder)
+        public StockRunner(ILogger<StockRunner> logger, IHistoryBuilder historyBuilder, ITSEOTCListBuilder tseOTCListBuilder, IStockInfoBuilder stockInfoBuilder, StockDBContext dbContext)
         {
             this.logger = logger;
             this.historyBuilder = historyBuilder;
             this.tseOTCListBuilder = tseOTCListBuilder;
             this.stockInfoBuilder = stockInfoBuilder;
+            this.dbContext = dbContext;
         }
         /// <summary>
         /// 一次性爬所有股票的Job，爬股價爬到現在這個月
         /// </summary>
-        /// <param name="dbContext"></param>
         /// <param name="from">輸入從哪年哪月開始爬</param>
         /// <returns></returns>
-        public async Task OneTimeCrawler(StockDBContext dbContext, DateTime from)
+        public async Task OneTimeCrawler(DateTime from)
         {
             var TSEList = tseOTCListBuilder.GetTSEList();
             var OTCList = tseOTCListBuilder.GetOTCList();
 
             foreach (var tse in TSEList)
             {
-                await OneTimeCrawler(TSEList, tse, StockType.TSE, dbContext, from);
+                await OneTimeCrawler(TSEList, tse, StockType.TSE, from);
             }
 
             foreach (var otc in OTCList)
             {
-                await OneTimeCrawler(OTCList, otc, StockType.OTC, dbContext, from);
+                await OneTimeCrawler(OTCList, otc, StockType.OTC, from);
             }
         }
         /// <summary>
@@ -51,24 +52,23 @@ namespace StockJob
         /// </summary>
         /// <param name="stockNo">股票編號</param>
         /// <param name="stockType">股票類型</param>
-        /// <param name="dbContext"></param>
         /// <param name="from">輸入從哪年哪月開始爬</param>
         /// <returns></returns>
-        public async Task OneTimeCrawler(string stockNo, StockType stockType, StockDBContext dbContext, DateTime from)
+        public async Task OneTimeCrawler(string stockNo, StockType stockType, DateTime from)
         {
             switch (stockType)
             {
                 case StockType.TSE:
                     var TSEList = tseOTCListBuilder.GetTSEList();
-                    await OneTimeCrawler(TSEList, stockNo, StockType.TSE, dbContext, from);
+                    await OneTimeCrawler(TSEList, stockNo, StockType.TSE, from);
                     break;
                 case StockType.OTC:
                     var OTCList = tseOTCListBuilder.GetOTCList();
-                    await OneTimeCrawler(OTCList, stockNo, StockType.OTC, dbContext, from);
+                    await OneTimeCrawler(OTCList, stockNo, StockType.OTC, from);
                     break;
             }
         }
-        private async Task OneTimeCrawler(HashSet<string> nowStockList, string stockNo, StockType stockType, StockDBContext dbContext, DateTime from)
+        private async Task OneTimeCrawler(HashSet<string> nowStockList, string stockNo, StockType stockType, DateTime from)
         {
             if (!nowStockList.Contains(stockNo))
             {
@@ -90,8 +90,9 @@ namespace StockJob
             }
             var utcNow = DateTime.UtcNow;
             var twNow = utcNow.AddHours(8);
-            var currentMonth = twNow;
-            while (currentMonth > from)
+            var currentMonth = new DateTime(twNow.Year, twNow.Month, twNow.Day);
+
+            while (currentMonth >= from)
             {
                 try
                 {

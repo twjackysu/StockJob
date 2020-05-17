@@ -26,10 +26,8 @@ namespace StockJob
                 using (servicesProvider as IDisposable)
                 {
                     var runner = servicesProvider.GetRequiredService<StockRunner>();
-                    using (var dbContext = new StockDBContext())
-                    {
-                        await runner.OneTimeCrawler(dbContext, new DateTime(2017, 1, 1));
-                    }
+
+                    await runner.OneTimeCrawler(new DateTime(2019, 1, 1));
                 }
             }
             catch (Exception ex)
@@ -53,6 +51,7 @@ namespace StockJob
                .AddTransient<IHistoryBuilder, HistoryBuilder>()
                .AddTransient<IStockInfoBuilder, StockInfoBuilder>()
                .AddTransient<ITSEOTCListBuilder, TSEOTCListBuilder>()
+               .AddDbContext<StockDBContext>()
                .AddLogging(loggingBuilder =>
                {
                    // configure Logging with NLog
