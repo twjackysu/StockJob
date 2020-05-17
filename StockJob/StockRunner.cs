@@ -1,10 +1,9 @@
-﻿using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using StockLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace StockJob
@@ -18,7 +17,8 @@ namespace StockJob
         private readonly StockDBContext dbContext;
         private const int nextMonthDelayMin = 4000;
         private const int nextMonthDelayMax = 12000;
-        private const int InfoNullDelayMax = 60000;
+        private const int IPLockDelayMin = 1800000;//half hour
+        private const int IPLockDelayMax = 3600000;//one hour
         public StockRunner(ILogger<StockRunner> logger, IHistoryBuilder historyBuilder, ITSEOTCListBuilder tseOTCListBuilder, IStockInfoBuilder stockInfoBuilder, StockDBContext dbContext)
         {
             this.logger = logger;
@@ -28,47 +28,70 @@ namespace StockJob
             this.dbContext = dbContext;
         }
         /// <summary>
-        /// 一次性爬所有股票的Job，爬股價爬到現在這個月
+        /// 一次性爬所有股票的資料，爬股價爬到現在這個月
         /// </summary>
         /// <param name="from">輸入從哪年哪月開始爬</param>
-        /// <returns></returns>
         public async Task OneTimeCrawler(DateTime from)
+        {
+            var utcNow = DateTime.UtcNow;
+            var twNow = utcNow.AddHours(8);
+            await OneTimeCrawler(from, twNow);
+        }
+
+        /// <summary>
+        /// 一次性爬所有股票的資料，爬股價爬到你指定的那個月
+        /// </summary>
+        /// <param name="from">從哪年哪月開始爬</param>
+        /// <param name="to">爬到哪年哪月結束</param>
+        public async Task OneTimeCrawler(DateTime from, DateTime to)
         {
             var TSEList = tseOTCListBuilder.GetTSEList();
             var OTCList = tseOTCListBuilder.GetOTCList();
 
             foreach (var tse in TSEList)
             {
-                await OneTimeCrawler(TSEList, tse, StockType.TSE, from);
+                await OneTimeCrawler(TSEList, tse, StockType.TSE, from, to);
             }
 
             foreach (var otc in OTCList)
             {
-                await OneTimeCrawler(OTCList, otc, StockType.OTC, from);
+                await OneTimeCrawler(OTCList, otc, StockType.OTC, from, to);
             }
         }
         /// <summary>
-        /// 一次性爬單支股票的Job，爬股價爬到現在這個月
+        /// 一次性爬單支股票的資料，爬股價爬到現在這個月
         /// </summary>
         /// <param name="stockNo">股票編號</param>
         /// <param name="stockType">股票類型</param>
         /// <param name="from">輸入從哪年哪月開始爬</param>
-        /// <returns></returns>
         public async Task OneTimeCrawler(string stockNo, StockType stockType, DateTime from)
+        {
+            var utcNow = DateTime.UtcNow;
+            var twNow = utcNow.AddHours(8);
+            await OneTimeCrawler(stockNo, stockType, from, twNow);
+        }
+        /// <summary>
+        /// 一次性爬單支股票的資料，爬股價爬到你指定的那個月
+        /// </summary>
+        /// <param name="stockNo">股票編號</param>
+        /// <param name="stockType">股票類型</param>
+        /// <param name="from">從哪年哪月開始爬</param>
+        /// <param name="to">爬到哪年哪月結束</param>
+        public async Task OneTimeCrawler(string stockNo, StockType stockType, DateTime from, DateTime to)
         {
             switch (stockType)
             {
                 case StockType.TSE:
                     var TSEList = tseOTCListBuilder.GetTSEList();
-                    await OneTimeCrawler(TSEList, stockNo, StockType.TSE, from);
+                    await OneTimeCrawler(TSEList, stockNo, StockType.TSE, from, to);
                     break;
                 case StockType.OTC:
                     var OTCList = tseOTCListBuilder.GetOTCList();
-                    await OneTimeCrawler(OTCList, stockNo, StockType.OTC, from);
+                    await OneTimeCrawler(OTCList, stockNo, StockType.OTC, from, to);
                     break;
             }
         }
-        private async Task OneTimeCrawler(HashSet<string> nowStockList, string stockNo, StockType stockType, DateTime from)
+        private async Task OneTimeCrawler(HashSet<string> nowStockList, string stockNo, StockType stockType, DateTime from, DateTime to)
         {
             if (!nowStockList.Contains(stockNo))
             {
@@ -83,29 +106,39 @@ namespace StockJob
                 info = (await stockInfoBuilder.GetStocksInfo((stockType, stockNo))).SingleOrDefault();
                 if (info == null)
                 {
-                    var delayMs = random.Next(InfoNullDelayMax);
+                    var delayMs = random.Next(IPLockDelayMin, IPLockDelayMax);
                     logger.LogInformation($"Get StockInfo Fail. Retry in {delayMs} ms");
                     await Task.Delay(delayMs);
                 }
             }
-            var utcNow = DateTime.UtcNow;
-            var twNow = utcNow.AddHours(8);
-            var currentMonth = new DateTime(twNow.Year, twNow.Month, twNow.Day);
+            from = new DateTime(from.Year, from.Month, 1);
+            var currentMonth = new DateTime(to.Year, to.Month, 1);
 
             while (currentMonth >= from)
             {
                 try
                 {
+                    var currentMonthEnd = new DateTime(currentMonth.Year, currentMonth.Month, DateTime.DaysInMonth(currentMonth.Year, currentMonth.Month));
+                    var dateHashSet = dbContext.StockHistory.Where(x => x.No == stockNo && x.Date >= currentMonth && x.Date <= currentMonthEnd).Select(x => x.Date).ToHashSet();
+
+                    if(dateHashSet.Count > 0)
+                    {
+                        logger.LogInformation($"{currentMonth:yyyyMM} {info.No} data already exists.");
+                        currentMonth = currentMonth.AddMonths(-1);
+                        continue;
+                    }
+
                     var histories = await historyBuilder.GetStockHistories(stockNo, currentMonth, stockType);
                     if (histories == null || histories.Length == 0)
                     {
                         break;
                     }
-                    //需要一些額外的方式偵測當IP被鎖時的情況
-
                     foreach (var history in histories)
                     {
-                        dbContext.Add(ConvertDBStockHistory(history, info.No, info.Type.ToString(), info.Name, info.FullName));
+                        if (!dateHashSet.Contains(history.Date))
+                        {
+                            dbContext.Add(ConvertDBStockHistory(history, info.No, info.Type.ToString(), info.Name, info.FullName));
+                        }
                     }
                     await dbContext.SaveChangesAsync();
                     var delayMs = random.Next(nextMonthDelayMin, nextMonthDelayMax);
@@ -116,6 +149,13 @@ namespace StockJob
                 catch (Exception e)
                 {
                     logger.LogError(e, $"Error when CurrentMonth = {currentMonth:yyyyMM} {info.No} {info.Name}");
+                    if (e is HttpRequestException)
+                    {
+                        //IP被鎖
+                        var delayMs = random.Next(IPLockDelayMin, IPLockDelayMax);
+                        logger.LogInformation($"Your IP has been blocked and will be restarted after {delayMs} ms delay.");
+                        await Task.Delay(delayMs);
+                    }
                 }
             }
         }
