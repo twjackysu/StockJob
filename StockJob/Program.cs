@@ -27,7 +27,7 @@ namespace StockJob
                 {
                     var runner = servicesProvider.GetRequiredService<StockRunner>();
 
-                    await runner.OneTimeCrawler(new DateTime(2019, 1, 1));
+                    await runner.OneTimeCrawler(new DateTime(2019, 1, 1), true);
                 }
             }
             catch (Exception ex)
