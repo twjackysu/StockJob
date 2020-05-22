@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace StockJob.Migrations
 {
-    public partial class Initial : Migration
+    public partial class InitialCreate : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -16,7 +16,6 @@ namespace StockJob.Migrations
                     No = table.Column<string>(maxLength: 50, nullable: false),
                     Type = table.Column<string>(maxLength: 50, nullable: false),
                     Name = table.Column<string>(maxLength: 50, nullable: false),
-                    FullName = table.Column<string>(maxLength: 100, nullable: false),
                     Date = table.Column<DateTime>(nullable: false),
                     TradeVolume = table.Column<long>(nullable: false),
                     TurnOverInValue = table.Column<decimal>(type: "decimal(16,2)", nullable: false),

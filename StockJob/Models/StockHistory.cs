@@ -21,9 +21,6 @@ namespace StockJob.Models
         [StringLength(50)]
         [Required(AllowEmptyStrings = false)]
         public string Name { get; set; }
-        [StringLength(100)]
-        [Required(AllowEmptyStrings = false)]
-        public string FullName { get; set; }
         /// <summary>日期</summary>
         public DateTime Date { get; set; }
         /// <summary>成交股數</summary>

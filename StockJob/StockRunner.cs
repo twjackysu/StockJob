@@ -52,12 +52,12 @@ namespace StockJob
 
             foreach (var tse in TSEList)
             {
-                await OneTimeCrawler(TSEList, tse, StockType.TSE, from, to, skipByMonth);
+                await OneTimeCrawler(TSEList, tse.Key, StockType.TSE, from, to, skipByMonth);
             }
 
             foreach (var otc in OTCList)
             {
-                await OneTimeCrawler(OTCList, otc, StockType.OTC, from, to, skipByMonth);
+                await OneTimeCrawler(OTCList, otc.Key, StockType.OTC, from, to, skipByMonth);
             }
         }
         /// <summary>
@@ -95,16 +95,15 @@ namespace StockJob
                     break;
             }
         }
-        private async Task OneTimeCrawler(HashSet<string> nowStockList, string stockNo, StockType stockType, DateTime from, DateTime to, bool skipByMonth = false)
+        private async Task OneTimeCrawler(Dictionary<string, string> nowStockList, string stockNo, StockType stockType, DateTime from, DateTime to, bool skipByMonth = false)
         {
-            if (!nowStockList.Contains(stockNo))
+            if (!nowStockList.ContainsKey(stockNo))
             {
                 logger.LogInformation($"The current StockType: {stockType} doesn't have this stock {stockNo}");
                 return;
             }
             var random  = new Random();
             //這邊全部同步去爬，非同步爬小心被鎖IP
-            StockInfo info = null;
             from = new DateTime(from.Year, from.Month, 1);
             var currentMonth = new DateTime(to.Year, to.Month, 1);
 
@@ -124,40 +123,30 @@ namespace StockJob
                             continue;
                         }
                     }
-                    while (info == null)
-                    {
-                        info = (await stockInfoBuilder.GetStocksInfo((stockType, stockNo))).SingleOrDefault();
-                        if (info == null)
-                        {
-                            var delayMs2 = random.Next(IPLockDelayMin, IPLockDelayMax);
-                            logger.LogInformation($"Get StockInfo Fail. Retry in {delayMs2} ms");
-                            await Task.Delay(delayMs2);
-                        }
-                    }
                     var delayMs = random.Next(nextMonthDelayMin, nextMonthDelayMax);
                     var histories = await historyBuilder.GetStockHistories(stockNo, currentMonth, stockType);
                     if (histories == null || histories.Length == 0)
                     {
                         currentMonth = currentMonth.AddMonths(-1);
                         await Task.Delay(delayMs);
-                        logger.LogWarning($"{currentMonth:yyyyMM} {info.No} No Data. The next one start after {delayMs} ms");
+                        logger.LogWarning($"{currentMonth:yyyyMM} {stockNo} No Data. The next one start after {delayMs} ms");
                         continue;
                     }
                     foreach (var history in histories)
                     {
                         if (!dateHashSet.Contains(history.Date))
                         {
-                            dbContext.Add(ConvertDBStockHistory(history, info.No, info.Type.ToString(), info.Name, info.FullName));
+                            dbContext.Add(ConvertDBStockHistory(history, stockNo, stockType.ToString(), nowStockList[stockNo]));
                         }
                     }
                     await dbContext.SaveChangesAsync();
-                    logger.LogInformation($"{currentMonth:yyyyMM} {info.No} Success. The next one start after {delayMs} ms");
+                    logger.LogInformation($"{currentMonth:yyyyMM} {stockNo} Success. The next one start after {delayMs} ms");
                     currentMonth = currentMonth.AddMonths(-1);
                     await Task.Delay(delayMs);
                 }
                 catch (Exception e)
                 {
-                    logger.LogError(e, $"Error when CurrentMonth = {currentMonth:yyyyMM} {info.No} {info.Name}");
+                    logger.LogError(e, $"Error when CurrentMonth = {currentMonth:yyyyMM} {stockNo} {nowStockList[stockNo]}");
                     if (e is HttpRequestException)
                     {
                         //IP被鎖
@@ -168,14 +157,13 @@ namespace StockJob
                 }
             }
         }
-        private Models.StockHistory ConvertDBStockHistory(StockHistory stockHistory, string no, string type, string name, string fullName)
+        private Models.StockHistory ConvertDBStockHistory(StockHistory stockHistory, string no, string type, string name)
         {
             return new Models.StockHistory()
             {
                 No = no,
                 Type = type,
                 Name = name,
-                FullName = fullName,
                 ClosingPrice = stockHistory.ClosingPrice,
                 DailyPricing = stockHistory.DailyPricing,
                 Date = stockHistory.Date,
