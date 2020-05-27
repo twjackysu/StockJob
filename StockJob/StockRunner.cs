@@ -15,8 +15,8 @@ namespace StockJob
         private readonly ITSEOTCListBuilder tseOTCListBuilder;
         private readonly IStockInfoBuilder stockInfoBuilder;
         private readonly StockDBContext dbContext;
-        private const int nextMonthDelayMin = 4000;
-        private const int nextMonthDelayMax = 12000;
+        private const int nextMonthDelayMin = 3000;
+        private const int nextMonthDelayMax = 6000;
         private const int IPLockDelayMin = 1800000; //half hour
         private const int IPLockDelayMax = 3600000; //one hour
         public StockRunner(ILogger<StockRunner> logger, IHistoryBuilder historyBuilder, ITSEOTCListBuilder tseOTCListBuilder, IStockInfoBuilder stockInfoBuilder, StockDBContext dbContext)
