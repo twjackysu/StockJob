@@ -127,9 +127,9 @@ namespace StockJob
                     var histories = await historyBuilder.GetStockHistories(stockNo, currentMonth, stockType);
                     if (histories == null || histories.Length == 0)
                     {
+                        logger.LogWarning($"{currentMonth:yyyyMM} {stockNo} No Data. The next one start after {delayMs} ms");
                         currentMonth = currentMonth.AddMonths(-1);
                         await Task.Delay(delayMs);
-                        logger.LogWarning($"{currentMonth:yyyyMM} {stockNo} No Data. The next one start after {delayMs} ms");
                         continue;
                     }
                     foreach (var history in histories)
