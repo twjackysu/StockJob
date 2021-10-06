@@ -21,7 +21,7 @@ class StockDBContext : DbContext
 在StockJob/StockJob.csproj那層的目錄下使用Powershell輸入以下更新資料庫
 ```
 dotnet tool install --global dotnet-ef
-dotnet ef database updat
+dotnet ef database update
 ```
 用git sub module載入我的另一個Repository: [StockLib](https://github.com/TWKuanLun/StockLib)
 
@@ -35,7 +35,7 @@ await runner.OneTimeCrawler(new DateTime(2017, 1, 1));
 ```
 爬201701到現在這個月為止的台泥(1101)股價資料到資料庫
 ```C#
-await runner.OneTimeCrawler("1101", StockType.TSE, new DateTime(2017, 1, 1));
+await runner.OneTimeCrawler("1101", new DateTime(2017, 1, 1));
 ```
 爬201701到201801為止的所有股價資料到資料庫
 ```C#
@@ -43,7 +43,7 @@ await runner.OneTimeCrawler(new DateTime(2017, 1, 1), new DateTime(2018, 1, 1));
 ```
 爬20170101到201901為止的台泥(1101)股價資料到資料庫
 ```C#
-await runner.OneTimeCrawler("1101", StockType.TSE, new DateTime(2017, 1, 1), new DateTime(2019, 1, 1));
+await runner.OneTimeCrawler("1101", new DateTime(2017, 1, 1), new DateTime(2019, 1, 1));
 ```
 
 所有DateTime都是以月為單位，不是以天為單位，new DateTime(2017, 5, 15)代表2017年5月(忽視15)。
