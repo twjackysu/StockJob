@@ -12,18 +12,18 @@ namespace StockJob
     {
         private readonly ILogger<StockRunner> logger;
         private readonly IHistoryBuilder historyBuilder;
-        private readonly ITSEOTCListBuilder tseOTCListBuilder;
+        private readonly IStockListBuilder stockListBuilder;
         private readonly IStockInfoBuilder stockInfoBuilder;
         private readonly StockDBContext dbContext;
         private const int nextMonthDelayMin = 3000;
         private const int nextMonthDelayMax = 6000;
         private const int IPLockDelayMin = 1800000; //half hour
         private const int IPLockDelayMax = 3600000; //one hour
-        public StockRunner(ILogger<StockRunner> logger, IHistoryBuilder historyBuilder, ITSEOTCListBuilder tseOTCListBuilder, IStockInfoBuilder stockInfoBuilder, StockDBContext dbContext)
+        public StockRunner(ILogger<StockRunner> logger, IHistoryBuilder historyBuilder, IStockListBuilder stockListBuilder, IStockInfoBuilder stockInfoBuilder, StockDBContext dbContext)
         {
             this.logger = logger;
             this.historyBuilder = historyBuilder;
-            this.tseOTCListBuilder = tseOTCListBuilder;
+            this.stockListBuilder = stockListBuilder;
             this.stockInfoBuilder = stockInfoBuilder;
             this.dbContext = dbContext;
         }
@@ -47,31 +47,24 @@ namespace StockJob
         /// <param name="skipByMonth">若當月資料庫內已有資料，是否跳過(如果月中爬過的話，下次要爬那個月必須為false，否則會跳過那個月)</param>
         public async Task OneTimeCrawler(DateTime from, DateTime to, bool skipByMonth = false)
         {
-            var TSEList = tseOTCListBuilder.GetTSEList();
-            var OTCList = tseOTCListBuilder.GetOTCList();
+            var stockList = await stockListBuilder.GetAllStockListAsync();
 
-            foreach (var tse in TSEList)
+            foreach (var stock in stockList)
             {
-                await OneTimeCrawler(TSEList, tse.Key, StockType.TSE, from, to, skipByMonth);
-            }
-
-            foreach (var otc in OTCList)
-            {
-                await OneTimeCrawler(OTCList, otc.Key, StockType.OTC, from, to, skipByMonth);
+                await OneTimeCrawler(stockList, stock.Key, from, to, skipByMonth);
             }
         }
         /// <summary>
         /// 一次性爬單支股票的資料，爬股價爬到現在這個月
         /// </summary>
         /// <param name="stockNo">股票編號</param>
-        /// <param name="stockType">股票類型</param>
         /// <param name="from">輸入從哪年哪月開始爬</param>
         /// <param name="skipByMonth">若當月資料庫內已有資料，是否跳過(如果月中爬過的話，下次要爬那個月必須為false，否則會跳過那個月)</param>
-        public async Task OneTimeCrawler(string stockNo, StockType stockType, DateTime from, bool skipByMonth = false)
+        public async Task OneTimeCrawler(string stockNo, DateTime from, bool skipByMonth = false)
         {
             var utcNow = DateTime.UtcNow;
             var twNow = utcNow.AddHours(8);
-            await OneTimeCrawler(stockNo, stockType, from, twNow, skipByMonth);
+            await OneTimeCrawler(stockNo, from, twNow, skipByMonth);
         }
         /// <summary>
         /// 一次性爬單支股票的資料，爬股價爬到你指定的那個月
@@ -81,25 +74,16 @@ namespace StockJob
         /// <param name="from">從哪年哪月開始爬</param>
         /// <param name="to">爬到哪年哪月結束</param>
         /// <param name="skipByMonth">若當月資料庫內已有資料，是否跳過(如果月中爬過的話，下次要爬那個月必須為false，否則會跳過那個月)</param>
-        public async Task OneTimeCrawler(string stockNo, StockType stockType, DateTime from, DateTime to, bool skipByMonth = false)
+        public async Task OneTimeCrawler(string stockNo, DateTime from, DateTime to, bool skipByMonth = false)
         {
-            switch (stockType)
-            {
-                case StockType.TSE:
-                    var TSEList = tseOTCListBuilder.GetTSEList();
-                    await OneTimeCrawler(TSEList, stockNo, StockType.TSE, from, to, skipByMonth);
-                    break;
-                case StockType.OTC:
-                    var OTCList = tseOTCListBuilder.GetOTCList();
-                    await OneTimeCrawler(OTCList, stockNo, StockType.OTC, from, to, skipByMonth);
-                    break;
-            }
+            var stockList = await stockListBuilder.GetAllStockListAsync();
+            await OneTimeCrawler(stockList, stockNo, from, to, skipByMonth);
         }
-        private async Task OneTimeCrawler(Dictionary<string, string> nowStockList, string stockNo, StockType stockType, DateTime from, DateTime to, bool skipByMonth = false)
+        private async Task OneTimeCrawler(Dictionary<string, Stock> nowStockList, string stockNo, DateTime from, DateTime to, bool skipByMonth = false)
         {
             if (!nowStockList.ContainsKey(stockNo))
             {
-                logger.LogInformation($"The current StockType: {stockType} doesn't have this stock {stockNo}");
+                logger.LogInformation($"The current stock list doesn't have this stock: {stockNo}");
                 return;
             }
             var random  = new Random();
@@ -124,7 +108,7 @@ namespace StockJob
                         }
                     }
                     var delayMs = random.Next(nextMonthDelayMin, nextMonthDelayMax);
-                    var histories = await historyBuilder.GetStockHistories(stockNo, currentMonth, stockType);
+                    var histories = await historyBuilder.GetStockHistories(stockNo, currentMonth, nowStockList[stockNo].Type);
                     if (histories == null || histories.Length == 0)
                     {
                         logger.LogWarning($"{currentMonth:yyyyMM} {stockNo} No Data. The next one start after {delayMs} ms");
@@ -136,7 +120,7 @@ namespace StockJob
                     {
                         if (!dateHashSet.Contains(history.Date))
                         {
-                            dbContext.Add(ConvertDBStockHistory(history, stockNo, stockType.ToString(), nowStockList[stockNo]));
+                            dbContext.Add(ConvertDBStockHistory(history, stockNo, nowStockList[stockNo].Type.ToString(), nowStockList[stockNo].Name));
                         }
                     }
                     await dbContext.SaveChangesAsync();

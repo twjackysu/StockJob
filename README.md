@@ -1,7 +1,7 @@
 # StockJob
 自製的歷史股價爬蟲
 
-目前使用 .NET Core 3.1.5
+目前使用 .NET Core 3.1.19
 請自行安裝SDK
 
 

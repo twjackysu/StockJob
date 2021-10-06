@@ -50,7 +50,7 @@ namespace StockJob
                .AddTransient<StockRunner>() // Runner is the custom class
                .AddTransient<IHistoryBuilder, HistoryBuilder>()
                .AddTransient<IStockInfoBuilder, StockInfoBuilder>()
-               .AddTransient<ITSEOTCListBuilder, TSEOTCListBuilder>()
+               .AddTransient<IStockListBuilder, StockListBuilderFromWeb>()
                .AddDbContext<StockDBContext>()
                .AddLogging(loggingBuilder =>
                {
